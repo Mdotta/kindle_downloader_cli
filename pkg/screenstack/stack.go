@@ -5,6 +5,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+// --- Model and initializer ---
 type Stack struct {
 	screens []tea.Model
 	help    help.Model
@@ -13,6 +14,8 @@ type Stack struct {
 func NewStack() *Stack {
 	return &Stack{help: help.New()}
 }
+
+// --- Stack management ---
 
 func (s *Stack) Push(screen tea.Model) {
 	s.screens = append(s.screens, screen)
@@ -38,6 +41,8 @@ func (s *Stack) Len() int {
 	return len(s.screens)
 }
 
+// --- Messages ---
+
 // BackMsg is a message that indicates the user wants to go back to the previous screen.
 type BackMsg struct{}
 
@@ -51,7 +56,10 @@ type ReplaceScreenMsg struct {
 	Screen tea.Model
 }
 
+// QuitMsg is a message that indicates the user wants to quit the application.
 type QuitMsg struct{}
+
+// --- Commands ---
 
 func QuitCmd() tea.Cmd {
 	return func() tea.Msg {
@@ -65,7 +73,6 @@ func PopCmd() tea.Cmd {
 	}
 }
 
-// Helper functions to create messages for pushing and replacing screens
 func PushCmd(screen tea.Model) tea.Cmd {
 	return func() tea.Msg {
 		return PushScreenMsg{Screen: screen}
@@ -78,7 +85,8 @@ func ReplaceCmd(screen tea.Model) tea.Cmd {
 	}
 }
 
-// Model implementation for Stack
+// --- Tea.Model interface implementation ---
+
 func (s *Stack) Init() tea.Cmd {
 	if s.Len() > 0 {
 		return s.Top().Init()

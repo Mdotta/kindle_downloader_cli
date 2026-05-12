@@ -9,6 +9,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+// --- Model and related methods for the SearchScreen ---
+
 type SearchScreen struct {
 	config         *config.Config
 	searchInput    textinput.Model
@@ -27,6 +29,8 @@ func (s *SearchScreen) KeyBindings() []key.Binding {
 		key.NewBinding(key.WithKeys("esc"), key.WithHelp("Esc", "back")),
 	}
 }
+
+// --- Tea.Model interface for SearchScreen ---
 
 func (s *SearchScreen) Init() tea.Cmd {
 	s.searchInput = textinput.New()

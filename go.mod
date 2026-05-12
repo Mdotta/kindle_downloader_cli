@@ -5,6 +5,7 @@ go 1.26.2
 require (
 	github.com/charmbracelet/bubbles v1.0.0
 	github.com/charmbracelet/bubbletea v1.3.10
+	golang.org/x/time v0.15.0
 )
 
 require (

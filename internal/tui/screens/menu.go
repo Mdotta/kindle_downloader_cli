@@ -8,6 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+// --- Model and related methods for the MenuScreen ---
 type MenuScreen struct {
 	// Add fields as needed, e.g., config, state, etc.
 	config         *config.Config
@@ -29,6 +30,8 @@ func (m *MenuScreen) KeyBindings() []key.Binding {
 		key.NewBinding(key.WithKeys("enter"), key.WithHelp("↵", "select")),
 	}
 }
+
+// --- Tea.Model interface for MenuScreen ---
 
 func (m *MenuScreen) Init() tea.Cmd {
 	// Initialize any necessary state or perform setup here
@@ -59,6 +62,21 @@ func (m *MenuScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m *MenuScreen) View() string {
+	// Return the string representation of the menu screen
+	render := ""
+	for i, option := range m.options {
+		prefix := "  "
+		if i == m.counter {
+			prefix = "> "
+		}
+		render += prefix + option + "\n"
+	}
+	return render
+}
+
+// --- Helper methods for menu actions ---
+
 func (m *MenuScreen) MoveUp() (tea.Model, tea.Cmd) {
 	// Implement logic to move the selection up in the menu
 	if m.counter > 0 {
@@ -78,17 +96,4 @@ func (m *MenuScreen) MoveDown() (tea.Model, tea.Cmd) {
 func (m *MenuScreen) SelectOption() (tea.Model, tea.Cmd) {
 	// Implement logic to select the current option and possibly push a new screen onto the stack
 	return m, m.optionCommands[m.counter]
-}
-
-func (m *MenuScreen) View() string {
-	// Return the string representation of the menu screen
-	render := ""
-	for i, option := range m.options {
-		prefix := "  "
-		if i == m.counter {
-			prefix = "> "
-		}
-		render += prefix + option + "\n"
-	}
-	return render
 }

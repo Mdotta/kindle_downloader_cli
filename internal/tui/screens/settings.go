@@ -11,6 +11,8 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+// --- Model and related methods for the SettingsScreen ---
+
 type SettingsScreen struct {
 	// Add fields as needed, e.g., config, state, etc.
 	config *config.Config
@@ -68,6 +70,8 @@ func (s *SettingsScreen) KeyBindings() []key.Binding {
 	}
 }
 
+// --- Tea.Model interface for SettingsScreen ---
+
 func (s *SettingsScreen) Init() tea.Cmd {
 	return nil
 }
@@ -117,6 +121,8 @@ func (s *SettingsScreen) View() string {
 	}
 	return render
 }
+
+// --- Helper methods for SettingsScreen ---
 
 func (s *SettingsScreen) blurAll() {
 	for i := range s.inputs {
