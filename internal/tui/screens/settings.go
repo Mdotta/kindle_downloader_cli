@@ -14,29 +14,27 @@ import (
 // --- Model and related methods for the SettingsScreen ---
 
 type SettingsScreen struct {
-	// Add fields as needed, e.g., config, state, etc.
 	config *config.Config
-	inputs []textinput.Model // one input per config field
-	focus  int               // which input is focused (0-based)
-	keys   []string          // json field names in order (for the label)
+	inputs []textinput.Model
+	focus  int
 }
 
 func NewSettingsScreen(cfg *config.Config) *SettingsScreen {
-
 	fields := []struct {
 		key     string
-		pointer *string // for string fields; nil for int
+		pointer *string
+		intPtr  *int
+		boolPtr *bool
 	}{
-		// label             pointer to config field
-		{"Kindle Email", &cfg.KindleEmail},
-		{"SMTP Host", &cfg.SMTPHost},
-		{"SMTP Port", nil}, // int field, handle separately
-		{"SMTP Username", &cfg.SMTPUsername},
-		{"SMTP Password", &cfg.SMTPPassword},
-		{"Language", &cfg.DefaultLanguage},
-		// {"Concurrent Downloads", nil}, // int field, handle separately
-		// {"MangaDex API Key", &cfg.MangaDexApiKey},
-		{"API Base URL", &cfg.ApiBaseUrl},
+		{"Kindle Email", &cfg.KindleEmail, nil, nil},
+		{"SMTP Host", &cfg.SMTPHost, nil, nil},
+		{"SMTP Port", nil, &cfg.SMTPPort, nil},
+		{"SMTP Username", &cfg.SMTPUsername, nil, nil},
+		{"SMTP Password", &cfg.SMTPPassword, nil, nil},
+		{"Language", &cfg.DefaultLanguage, nil, nil},
+		{"API Base URL", &cfg.ApiBaseUrl, nil, nil},
+		{"Send to Kindle (space=toggle)", nil, nil, &cfg.SendToKindle},
+		{"Download Dir", &cfg.DownloadDir, nil, nil},
 	}
 
 	inputs := make([]textinput.Model, len(fields))
@@ -45,8 +43,14 @@ func NewSettingsScreen(cfg *config.Config) *SettingsScreen {
 		ti.Placeholder = f.key
 		if f.pointer != nil {
 			ti.SetValue(*f.pointer)
-		} else {
-			ti.SetValue(fmt.Sprintf("%d", cfg.SMTPPort))
+		} else if f.intPtr != nil {
+			ti.SetValue(fmt.Sprintf("%d", *f.intPtr))
+		} else if f.boolPtr != nil {
+			if *f.boolPtr {
+				ti.SetValue("yes")
+			} else {
+				ti.SetValue("no")
+			}
 		}
 		if i == 0 {
 			ti.Focus()
@@ -87,6 +91,20 @@ func (s *SettingsScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "esc":
 			return s, screenstack.PopCmd()
 
+		case " ":
+			// Toggle boolean fields (Send to Kindle is at index 7)
+			if s.focus == 7 {
+				s.config.SendToKindle = !s.config.SendToKindle
+				if s.config.SendToKindle {
+					s.inputs[7].SetValue("yes")
+				} else {
+					s.inputs[7].SetValue("no")
+				}
+				return s, nil
+			}
+			cmd := s.updateInputs(msg)
+			return s, cmd
+
 		case "tab", "down":
 			s.blurAll()
 			s.focus = (s.focus + 1) % len(s.inputs)
@@ -112,13 +130,29 @@ func (s *SettingsScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (s *SettingsScreen) View() string {
 	render := "Settings\n"
+	labels := []string{
+		"Kindle Email",
+		"SMTP Host",
+		"SMTP Port",
+		"SMTP Username",
+		"SMTP Password",
+		"Language",
+		"API Base URL",
+		"Send to Kindle",
+		"Download Dir",
+	}
 	for i, input := range s.inputs {
 		cursor := "  "
 		if i == s.focus {
 			cursor = "❯ "
 		}
-		render += fmt.Sprintf("%s%s\n", cursor, input.View())
+		label := ""
+		if i < len(labels) {
+			label = fmt.Sprintf("%-16s", labels[i])
+		}
+		render += fmt.Sprintf("%s%s %s\n", cursor, label, input.View())
 	}
+	render += "\nTab/↑↓ navigate · Space=toggle · Ctrl+S save · Esc back\n"
 	return render
 }
 
@@ -147,5 +181,8 @@ func (s *SettingsScreen) save() {
 	s.config.SMTPUsername = s.inputs[3].Value()
 	s.config.SMTPPassword = s.inputs[4].Value()
 	s.config.DefaultLanguage = s.inputs[5].Value()
+	s.config.ApiBaseUrl = s.inputs[6].Value()
+	// Send to Kindle (index 7) — already set via toggle
+	s.config.DownloadDir = s.inputs[8].Value()
 	s.config.Save()
 }

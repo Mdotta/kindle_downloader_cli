@@ -106,22 +106,13 @@ func (m MangaItem) FilterValue() string { return m.TitleStr }
 // --- Tea.Model ---
 
 func (s *SearchScreen) Init() tea.Cmd {
-	return textinput.Blink
+	return tea.Batch(textinput.Blink, tea.WindowSize())
 }
 
 func (s *SearchScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		s.width = msg.Width
-		s.height = msg.Height
-		s.resultList.SetWidth(msg.Width)
-		h := msg.Height - 6
-		if h < 4 {
-			h = 4
-		}
-		s.resultList.SetHeight(h)
-		s.searchInput.Width = msg.Width - 4
-		return s, nil
+		return s.HandleScreenResize(msg)
 
 	case spinner.TickMsg:
 		if s.loading {
@@ -182,6 +173,19 @@ func (s *SearchScreen) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	// Delegate spinner ticks
+	return s, nil
+}
+
+func (s *SearchScreen) HandleScreenResize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
+	s.width = msg.Width
+	s.height = msg.Height
+	s.resultList.SetWidth(msg.Width)
+	h := msg.Height - 6
+	if h < 4 {
+		h = 4
+	}
+	s.resultList.SetHeight(h)
+	s.searchInput.Width = msg.Width - 4
 	return s, nil
 }
 

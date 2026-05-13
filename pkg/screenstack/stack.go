@@ -56,6 +56,8 @@ type ReplaceScreenMsg struct {
 	Screen tea.Model
 }
 
+type BackToRootMsg struct{}
+
 // QuitMsg is a message that indicates the user wants to quit the application.
 type QuitMsg struct{}
 
@@ -79,6 +81,12 @@ func PushCmd(screen tea.Model) tea.Cmd {
 	}
 }
 
+func BackToRootCmd() tea.Cmd {
+	return func() tea.Msg {
+		return BackToRootMsg{}
+	}
+}
+
 func ReplaceCmd(screen tea.Model) tea.Cmd {
 	return func() tea.Msg {
 		return ReplaceScreenMsg{Screen: screen}
@@ -98,6 +106,11 @@ func (s *Stack) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case QuitMsg:
 		return s, tea.Quit
+	case BackToRootMsg:
+		firstScreen := s.screens[0]
+		s.screens = nil
+		s.Push(firstScreen)
+		return s, s.Top().Init()
 	case BackMsg:
 		s.Pop()
 		return s, nil

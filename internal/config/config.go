@@ -27,6 +27,8 @@ type Config struct {
 	DefaultLanguage     string `json:"default_language"`
 	ConcurrentDownloads int    `json:"concurrent_downloads"`
 	ApiBaseUrl          string `json:"api_base_url"`
+	SendToKindle        bool   `json:"send_to_kindle"`
+	DownloadDir         string `json:"download_dir"`
 }
 
 func DefaultConfig() *Config {
@@ -34,12 +36,14 @@ func DefaultConfig() *Config {
 		KindleEmail:         "",
 		MangaDexApiKey:      "",
 		SMTPHost:            "",
-		SMTPPort:            587,
+		SMTPPort:            465,
 		SMTPUsername:        "",
 		SMTPPassword:        "",
 		DefaultLanguage:     "en",
 		ConcurrentDownloads: 5,
 		ApiBaseUrl:          "https://api.mangadex.org",
+		SendToKindle:        false,
+		DownloadDir:         "",
 	}
 }
 
