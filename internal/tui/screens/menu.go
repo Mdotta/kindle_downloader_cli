@@ -1,6 +1,7 @@
 package screens
 
 import (
+	"kindle_cli/internal/atsu"
 	"kindle_cli/internal/config"
 	"kindle_cli/pkg/screenstack"
 
@@ -10,16 +11,17 @@ import (
 
 // --- Model and related methods for the MenuScreen ---
 type MenuScreen struct {
-	// Add fields as needed, e.g., config, state, etc.
 	config         *config.Config
+	client         *atsu.Client
 	counter        int
 	options        []string
 	optionCommands []tea.Cmd
 }
 
-func NewMenuScreen(cfg *config.Config) *MenuScreen {
+func NewMenuScreen(cfg *config.Config, client *atsu.Client) *MenuScreen {
 	return &MenuScreen{
 		config: cfg,
+		client: client,
 	}
 }
 
@@ -37,11 +39,11 @@ func (m *MenuScreen) Init() tea.Cmd {
 	// Initialize any necessary state or perform setup here
 	m.counter = 0
 	m.options = []string{"Search Manga", "Settings", "Quit"}
-	m.optionCommands = []tea.Cmd{
-		screenstack.PushCmd(NewSearchScreen(m.config)),
-		screenstack.PushCmd(NewSettingsScreen(m.config)),
-		screenstack.QuitCmd(),
-	}
+		m.optionCommands = []tea.Cmd{
+			screenstack.PushCmd(NewSearchScreen(m.config, m.client)),
+			screenstack.PushCmd(NewSettingsScreen(m.config)),
+			screenstack.QuitCmd(),
+		}
 	return nil
 }
 

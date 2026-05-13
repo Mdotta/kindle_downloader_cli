@@ -3,24 +3,27 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"time"
 
-	"kindle_cli/internal/mangadex"
+	"kindle_cli/internal/atsu"
 )
 
 func main() {
-	fmt.Println("=== MangaDex Client Test ===")
+	fmt.Println("=== Atsu.moe Client Test ===")
 	fmt.Println()
 
-	client := mangadex.NewClient("https://api.mangadex.org", "en")
+	client := atsu.NewClient([]string{"en"})
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
 	// ── Step 1: Search ──
-	fmt.Print("[1] Searching for 'frieren'... ")
-	mangas, err := client.SearchManga(ctx, "Sousou no Frieren")
+	query := "Solo Leveling"
+	fmt.Printf("[1] Searching for '%s'... ", query)
+	mangas, total, err := client.Search(ctx, query, 1, 10)
 	if err != nil {
 		fmt.Printf("FAIL\n    %v\n", err)
 		os.Exit(1)
@@ -29,58 +32,46 @@ func main() {
 		fmt.Println("FAIL\n    no results")
 		os.Exit(1)
 	}
-	fmt.Println("OK")
+	fmt.Printf("OK (%d results)\n", total)
 	for _, m := range mangas[:min(3, len(mangas))] {
-		fmt.Printf("    %s [%s]  %v\n", m.Title, m.ID, m.CoverURL)
+		fmt.Printf("    %s [%s]  %s  %s\n", m.Title, m.ID, m.Type, m.Status)
 	}
 
-	// ── Step 2: Get chapters ──
+	// ── Step 2: Get manga detail ──
 	manga := mangas[0]
-	fmt.Printf("\n[2] Getting chapters for '%s' (%s)... ", manga.Title, manga.ID)
-	volumes, err := client.GetChapters(ctx, manga.ID)
+	fmt.Printf("\n[2] Getting detail for '%s' (%s)... ", manga.Title, manga.ID)
+	detail, err := client.GetManga(ctx, manga.ID)
 	if err != nil {
 		fmt.Printf("FAIL\n    %v\n", err)
 		os.Exit(1)
 	}
-	fmt.Printf("OK (%d volumes)\n", len(volumes))
-	for vol, chs := range volumes {
-		fmt.Printf("    Vol. %s: %d chapters\n", vol, len(chs))
+	fmt.Printf("OK (%d chapters, %d scanlators)\n", len(detail.Chapters), len(detail.Scanlators))
+	for _, s := range detail.Scanlators {
+		fmt.Printf("    Scanlator: %s (%s)\n", s.Name, s.ID)
+	}
+	for _, ch := range detail.Chapters[:min(5, len(detail.Chapters))] {
+		fmt.Printf("    Ch. %s [%s] (%d pages)\n", ch.Title, ch.ID, ch.PageCount)
 	}
 
 	// ── Step 3: Get chapter pages ──
-	var firstID string
-	var firstVol string
-	var firstCh string
-	for vol, chs := range volumes {
-		if vol == "No Volume" {
-			continue
-		}
-		if len(chs) > 0 {
-			firstVol = vol
-			firstID = chs[0].ID
-			firstCh = chs[0].Chapter
-			break
-		}
-	}
-	if firstID == "" {
-		fmt.Println("\n[3] No volumed chapters to test — skipping download tests")
+	if len(detail.Chapters) == 0 {
+		fmt.Println("\n[3] No chapters to test")
 		return
 	}
-
-	fmt.Printf("\n[3] Getting pages for Vol.%s Ch.%s... ", firstVol, firstCh)
-	pages, err := client.GetChapterPages(ctx, firstID)
+	ch := detail.Chapters[0]
+	fmt.Printf("\n[3] Getting pages for '%s' (mangaId=%s, chapterId=%s)... ", ch.Title, manga.ID, ch.ID)
+	pages, err := client.GetChapterPages(ctx, manga.ID, ch.ID)
 	if err != nil {
 		fmt.Printf("FAIL\n    %v\n", err)
 		os.Exit(1)
 	}
 	fmt.Printf("OK (%d pages)\n", len(pages.Pages))
-	fmt.Printf("    baseUrl: %s\n    hash: %s\n", pages.BaseURL, pages.Hash)
-	for i, p := range pages.Pages[:min(3, len(pages.Pages))] {
-		fmt.Printf("    [%d] %s\n", i+1, p)
+	for _, p := range pages.Pages[:min(3, len(pages.Pages))] {
+		fmt.Printf("    [%d] %s (%dx%d)\n", p.Number, p.ImageURL, p.Width, p.Height)
 	}
 
-	// ── Step 4: Download a single chapter ──
-	fmt.Printf("\n[4] Downloading Vol.%s Ch.%s (%d pages)...\n", firstVol, firstCh, len(pages.Pages))
+	// ── Step 4: Download images ──
+	fmt.Printf("\n[4] Downloading first 5 images...\n")
 	tmpDir, err := os.MkdirTemp("", "kindle_cli_test")
 	if err != nil {
 		fmt.Printf("    FAIL: creating temp dir: %v\n", err)
@@ -88,29 +79,57 @@ func main() {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	// Only download the first chapter of the first volume
-	singleVolume := map[string][]mangadex.Chapter{
-		firstVol: volumes[firstVol][:1],
-	}
-
-	results := client.DownloadVolumes(ctx, manga.Title, singleVolume, tmpDir, 2)
 	ok := 0
-	failed := 0
-	for r := range results {
-		if r.Error != nil {
-			failed++
-			fmt.Printf("    FAIL  pg %d/%d: %v\n", r.Page, r.Total, r.Error)
-		} else if r.Done {
-			fmt.Printf("    DONE  Vol.%s Ch.%s — %d pages, %d failed\n", r.Volume, r.Chapter, r.Total, failed)
+	for i, p := range pages.Pages {
+		if i >= 5 {
+			break
+		}
+		dest := filepath.Join(tmpDir, fmt.Sprintf("pg%03d.webp", p.Number))
+		if err := downloadFile(ctx, p.ImageURL, dest); err != nil {
+			fmt.Printf("    FAIL  pg %d: %v\n", p.Number, err)
 		} else {
 			ok++
-			fmt.Printf("    OK    pg %d/%d => %s\n", r.Page, r.Total, filepath.Base(r.File))
+			fmt.Printf("    OK    pg %d → %s\n", p.Number, filepath.Base(dest))
 		}
 	}
 
-	if failed > 0 {
-		fmt.Printf("\nFAIL: %d/%d pages failed\n", failed, ok+failed)
+	if ok == 0 {
+		fmt.Println("\nFAIL: no images downloaded")
 		os.Exit(1)
 	}
-	fmt.Printf("\n=== All tests passed (%d pages downloaded) ===\n", ok)
+	fmt.Printf("\n=== All tests passed (%d images downloaded to %s) ===\n", ok, tmpDir)
+}
+
+func downloadFile(ctx context.Context, url, dest string) error {
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36")
+	req.Header.Set("Referer", "https://atsu.moe/")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+
+	if err := os.MkdirAll(filepath.Dir(dest), 0755); err != nil {
+		return err
+	}
+
+	f, err := os.Create(dest)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	if _, err := io.Copy(f, resp.Body); err != nil {
+		return err
+	}
+	return nil
 }

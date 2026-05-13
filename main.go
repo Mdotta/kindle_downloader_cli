@@ -2,10 +2,12 @@ package main
 
 import (
 	"fmt"
+	"kindle_cli/internal/atsu"
 	"kindle_cli/internal/config"
 	"kindle_cli/internal/tui/screens"
 	"kindle_cli/pkg/screenstack"
 	"os"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -17,9 +19,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	stack := screenstack.NewStack()
+	client := atsu.NewClient(strings.Split(cfg.DefaultLanguage, ","))
 
-	stack.Push(screens.NewMenuScreen(cfg))
+	stack := screenstack.NewStack()
+	stack.Push(screens.NewMenuScreen(cfg, client))
 	p := tea.NewProgram(stack, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Error: %v\n", err)
